@@ -49,6 +49,29 @@ def init_db():
         )
     """)
 
+    # Tabla de usuarios para login
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            nombre_completo TEXT,
+            rol TEXT DEFAULT 'usuario'
+        )
+    """)
+
+    # Insertar usuario por defecto (admin / admin123)
+    cursor.execute("""
+        INSERT OR IGNORE INTO usuarios (username, password, nombre_completo, rol)
+        VALUES ('admin', 'admin123', 'Administrador del Sistema', 'administrador')
+    """)
+    
+    # Insertar usuario de prueba (usuario / usuario123)
+    cursor.execute("""
+        INSERT OR IGNORE INTO usuarios (username, password, nombre_completo, rol)
+        VALUES ('usuario', 'usuario123', 'Usuario Normal', 'usuario')
+    """)
+
     conn.commit()
     conn.close()
 
@@ -57,6 +80,140 @@ def init_db():
 def home():
     return "Backend del sistema de bienes funcionando correctamente"
 
+
+# ========== ENDPOINTS DE LOGIN ==========
+
+@app.route("/login", methods=["POST"])
+def login():
+    try:
+        data = request.get_json()
+        username = data.get("username", "").strip()
+        password = data.get("password", "").strip()
+
+        if not username or not password:
+            return jsonify({
+                "ok": False,
+                "mensaje": "Usuario y contraseña son obligatorios"
+            }), 400
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, username, nombre_completo, rol 
+            FROM usuarios 
+            WHERE username = ? AND password = ?
+        """, (username, password))
+        
+        usuario = cursor.fetchone()
+        conn.close()
+
+        if usuario:
+            return jsonify({
+                "ok": True,
+                "mensaje": "Login exitoso",
+                "usuario": dict(usuario)
+            })
+        else:
+            return jsonify({
+                "ok": False,
+                "mensaje": "Usuario o contraseña incorrectos"
+            }), 401
+
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "mensaje": f"Error en login: {str(e)}"
+        }), 500
+
+
+@app.route("/verificar_sesion", methods=["GET"])
+def verificar_sesion():
+    """Endpoint para verificar que el backend está activo"""
+    return jsonify({"ok": True, "mensaje": "Sesión válida"})
+
+
+@app.route("/cambiar_password", methods=["POST"])
+def cambiar_password():
+    """Cambiar contraseña de un usuario"""
+    try:
+        data = request.get_json()
+        username = data.get("username", "").strip()
+        password_actual = data.get("password_actual", "").strip()
+        password_nueva = data.get("password_nueva", "").strip()
+
+        if not username or not password_actual or not password_nueva:
+            return jsonify({
+                "ok": False,
+                "mensaje": "Todos los campos son obligatorios"
+            }), 400
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Verificar credenciales actuales
+        cursor.execute("""
+            SELECT id FROM usuarios 
+            WHERE username = ? AND password = ?
+        """, (username, password_actual))
+        
+        usuario = cursor.fetchone()
+
+        if not usuario:
+            conn.close()
+            return jsonify({
+                "ok": False,
+                "mensaje": "Contraseña actual incorrecta"
+            }), 401
+
+        # Actualizar contraseña
+        cursor.execute("""
+            UPDATE usuarios 
+            SET password = ?
+            WHERE username = ?
+        """, (password_nueva, username))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            "ok": True,
+            "mensaje": "Contraseña actualizada correctamente"
+        })
+
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "mensaje": f"Error al cambiar contraseña: {str(e)}"
+        }), 500
+
+
+@app.route("/usuarios", methods=["GET"])
+def listar_usuarios():
+    """Listar todos los usuarios (solo para administradores)"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, username, nombre_completo, rol 
+            FROM usuarios 
+            ORDER BY id
+        """)
+        filas = cursor.fetchall()
+        conn.close()
+
+        usuarios = [dict(fila) for fila in filas]
+        return jsonify(usuarios)
+
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "mensaje": f"Error al listar usuarios: {str(e)}"
+        }), 500
+
+
+# ========== ENDPOINTS DEL SISTEMA DE BIENES ==========
 
 @app.route("/registrar_bien", methods=["POST"])
 def registrar_bien():
@@ -360,6 +517,7 @@ def listar_historial():
             "mensaje": f"Error al obtener historial: {str(e)}"
         }), 500
 
+
 @app.route("/reporte_bienes_pdf", methods=["GET"])
 def generar_pdf_bienes():
     try:
@@ -375,32 +533,33 @@ def generar_pdf_bienes():
         # Título
         pdf.set_font("Arial", "B", 16)
         pdf.cell(200, 10, "REPORTE DE BIENES", ln=True, align="C")
-
+        pdf.ln(5)
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(200, 8, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", ln=True, align="C")
         pdf.ln(10)
 
+        # Estadística
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(200, 10, f"Total de bienes: {len(bienes)}", ln=True, align="L")
+        pdf.ln(5)
+
         # Encabezados
-        pdf.set_font("Arial", "B", 10)
-        pdf.cell(30, 8, "CODIGO", 1)
-        pdf.cell(50, 8, "NOMBRE", 1)
-        pdf.cell(40, 8, "ESTADO", 1)
-        pdf.cell(60, 8, "PERSONA", 1)
-        pdf.ln()
+        pdf.set_font("Arial", "B", 9)
+        pdf.cell(30, 8, "CODIGO", 1, 0, "C")
+        pdf.cell(50, 8, "NOMBRE", 1, 0, "C")
+        pdf.cell(40, 8, "ESTADO", 1, 0, "C")
+        pdf.cell(60, 8, "PERSONA", 1, 1, "C")
 
         # Datos
-        pdf.set_font("Arial", "", 9)
-
+        pdf.set_font("Arial", "", 8)
         for b in bienes:
-            pdf.cell(30, 8, str(b["codigo_patrimonial"])[:10], 1)
-            pdf.cell(50, 8, str(b["nombre"])[:20], 1)
-            pdf.cell(40, 8, str(b["estado"])[:15], 1)
-            pdf.cell(60, 8, str(b["persona_asignada"])[:25], 1)
-            pdf.ln()
+            pdf.cell(30, 7, str(b["codigo_patrimonial"])[:25], 1, 0, "L")
+            pdf.cell(50, 7, str(b["nombre"])[:25], 1, 0, "L")
+            pdf.cell(40, 7, str(b["estado"])[:15], 1, 0, "L")
+            pdf.cell(60, 7, str(b["persona_asignada"])[:25], 1, 1, "L")
 
-        # Guardar PDF
-        # 🔥 GENERAR PDF EN MEMORIA (CORRECTO)
+        # Generar PDF
         pdf_bytes = pdf.output(dest='S').encode('latin1')
-
-        # 🔥 CREAR BUFFER
         buffer = io.BytesIO(pdf_bytes)
 
         conn.close()
@@ -408,7 +567,7 @@ def generar_pdf_bienes():
         return send_file(
             buffer,
             as_attachment=True,
-            download_name="reporte_bienes.pdf",
+            download_name=f"reporte_bienes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
             mimetype="application/pdf"
         )
 
@@ -417,6 +576,73 @@ def generar_pdf_bienes():
             "ok": False,
             "mensaje": f"Error al generar PDF: {str(e)}"
         }), 500
+
+
+@app.route("/reporte_historial_pdf", methods=["GET"])
+def generar_pdf_historial():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT * FROM historial 
+            ORDER BY fecha DESC
+        """)
+        historial = cursor.fetchall()
+        conn.close()
+
+        pdf = FPDF()
+        pdf.add_page()
+
+        # Título
+        pdf.set_font("Arial", "B", 16)
+        pdf.cell(200, 10, "REPORTE DE HISTORIAL DE DESPLAZAMIENTOS", ln=True, align="C")
+        pdf.ln(5)
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(200, 8, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", ln=True, align="C")
+        pdf.ln(10)
+
+        # Estadística
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(200, 10, f"Total de movimientos: {len(historial)}", ln=True, align="L")
+        pdf.ln(5)
+
+        # Encabezados
+        pdf.set_font("Arial", "B", 8)
+        pdf.cell(25, 8, "Código", 1, 0, "C")
+        pdf.cell(45, 8, "Bien", 1, 0, "C")
+        pdf.cell(35, 8, "Persona Anterior", 1, 0, "C")
+        pdf.cell(35, 8, "Persona Nueva", 1, 0, "C")
+        pdf.cell(30, 8, "Motivo", 1, 0, "C")
+        pdf.cell(40, 8, "Fecha", 1, 1, "C")
+
+        # Datos
+        pdf.set_font("Arial", "", 7)
+        for item in historial:
+            pdf.cell(25, 7, item["codigo_patrimonial"][:20], 1, 0, "L")
+            pdf.cell(45, 7, item["nombre_bien"][:25], 1, 0, "L")
+            pdf.cell(35, 7, item["persona_anterior"][:18], 1, 0, "L")
+            pdf.cell(35, 7, item["persona_nueva"][:18], 1, 0, "L")
+            pdf.cell(30, 7, item["motivo"][:20], 1, 0, "L")
+            pdf.cell(40, 7, item["fecha"][:16], 1, 1, "L")
+
+        # Generar PDF
+        pdf_bytes = pdf.output(dest='S').encode('latin1')
+        buffer = io.BytesIO(pdf_bytes)
+
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"reporte_historial_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+            mimetype="application/pdf"
+        )
+
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "mensaje": f"Error al generar PDF de historial: {str(e)}"
+        }), 500
+
 
 if __name__ == "__main__":
     init_db()

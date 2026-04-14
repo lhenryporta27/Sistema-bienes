@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Bienes</title>
+    <link rel="stylesheet" href="estilos.css">
+</head>
+
+<body>
+
+    <div class="contenedor">
+        <h1>Sistema de Gestión de Bienes</h1>
+
+        <section class="bloque">
+            <h2>Registrar Bien</h2>
+
+            <form id="formBien">
+                <label for="codigo_patrimonial">Código Patrimonial</label>
+                <input type="text" id="codigo_patrimonial" placeholder="Ingrese código único" required>
+
+                <label for="nombre">Nombre del Bien</label>
+                <input type="text" id="nombre" placeholder="Ingrese nombre del bien" required>
+
+                <label for="descripcion">Descripción</label>
+                <input type="text" id="descripcion" placeholder="Ingrese descripción" required>
+
+                <label for="estado">Estado</label>
+                <input type="text" id="estado" placeholder="Ejemplo: ACTIVO" required>
+
+                <label for="persona_asignada">Persona Asignada</label>
+                <input type="text" id="persona_asignada" placeholder="Ingrese nombre de la persona" required>
+
+                <button type="submit">Registrar Bien</button>
+            </form>
+        </section>
+
+        <section class="bloque">
+            <h2>Importar Bienes desde Excel</h2>
+
+            <input type="file" id="archivoExcel" accept=".xlsx,.xls">
+            <button type="button" id="btnImportarExcel">Importar Excel</button>
+            <p id="resultadoImportacion"></p>
+        </section>
+
+        <section class="bloque">
+            <h2>Bienes Registrados</h2>
+
+            <button type="button" id="btnCargarBienes">Ver Bienes</button>
+
+            <div class="tabla-contenedor">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Seleccionar</th>
+                            <th>ID</th>
+                            <th>Código</th>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Estado</th>
+                            <th>Persona Asignada</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaBienes"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="bloque">
+            <h2>Desplazamiento de Bienes</h2>
+
+            <label for="nueva_persona">Transferir a</label>
+            <input type="text" id="nueva_persona" placeholder="Nombre de la nueva persona">
+
+            <label for="motivo">Motivo</label>
+            <input type="text" id="motivo" placeholder="Ejemplo: renuncia, cambio de área">
+
+            <button type="button" id="btnDesplazar">Realizar Desplazamiento</button>
+        </section>
+
+        <section class="bloque">
+            <h2>Historial de Movimientos</h2>
+
+            <button type="button" id="btnCargarHistorial">Ver Historial</button>
+
+            <div class="tabla-contenedor">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Código</th>
+                            <th>Bien</th>
+                            <th>Persona Anterior</th>
+                            <th>Persona Nueva</th>
+                            <th>Motivo</th>
+                            <th>Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaHistorial"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

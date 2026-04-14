@@ -1,8 +1,10 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import sqlite3
 import pandas as pd
 from datetime import datetime
+from fpdf import FPDF
+import io
 
 app = Flask(__name__)
 CORS(app)
@@ -358,6 +360,63 @@ def listar_historial():
             "mensaje": f"Error al obtener historial: {str(e)}"
         }), 500
 
+@app.route("/reporte_bienes_pdf", methods=["GET"])
+def generar_pdf_bienes():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM bienes ORDER BY id DESC")
+        bienes = cursor.fetchall()
+
+        pdf = FPDF()
+        pdf.add_page()
+
+        # Título
+        pdf.set_font("Arial", "B", 16)
+        pdf.cell(200, 10, "REPORTE DE BIENES", ln=True, align="C")
+
+        pdf.ln(10)
+
+        # Encabezados
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(30, 8, "CODIGO", 1)
+        pdf.cell(50, 8, "NOMBRE", 1)
+        pdf.cell(40, 8, "ESTADO", 1)
+        pdf.cell(60, 8, "PERSONA", 1)
+        pdf.ln()
+
+        # Datos
+        pdf.set_font("Arial", "", 9)
+
+        for b in bienes:
+            pdf.cell(30, 8, str(b["codigo_patrimonial"])[:10], 1)
+            pdf.cell(50, 8, str(b["nombre"])[:20], 1)
+            pdf.cell(40, 8, str(b["estado"])[:15], 1)
+            pdf.cell(60, 8, str(b["persona_asignada"])[:25], 1)
+            pdf.ln()
+
+        # Guardar PDF
+        # 🔥 GENERAR PDF EN MEMORIA (CORRECTO)
+        pdf_bytes = pdf.output(dest='S').encode('latin1')
+
+        # 🔥 CREAR BUFFER
+        buffer = io.BytesIO(pdf_bytes)
+
+        conn.close()
+
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name="reporte_bienes.pdf",
+            mimetype="application/pdf"
+        )
+
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "mensaje": f"Error al generar PDF: {str(e)}"
+        }), 500
 
 if __name__ == "__main__":
     init_db()

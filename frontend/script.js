@@ -223,3 +223,9 @@ async function cargarHistorial() {
         console.error(error);
     }
 }
+
+const btnPDF = document.getElementById("btnPDF");
+
+btnPDF.addEventListener("click", function () {
+    window.open("http://127.0.0.1:5000/reporte_bienes_pdf", "_blank");
+});
